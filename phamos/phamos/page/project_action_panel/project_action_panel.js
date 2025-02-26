@@ -664,6 +664,11 @@ function renderDataTable(wrapper, projectData) {
         <div class="form-tabs-list">
           <ul class="nav form-tabs" id="form-tabs" role="tablist">
             <li class="nav-item show">
+              <a class="nav-link" id="DAP-recent-project-tab" role="tab" aria-controls="recent-projects" aria-selected="false">
+                  Recent Projects
+              </a>
+            </li>
+            <li class="nav-item show">
               <!-- 'Your Projects' tab is the default active tab -->
               <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
                   Your Projects
@@ -679,6 +684,10 @@ function renderDataTable(wrapper, projectData) {
         </div>
         <div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
           <div id="card-wrapper"></div>
+            <div class="dropdown-container" style="display:none">
+              <select id="time-span-select" class="custom-dropdown-timespan"></select>
+            </div>
+            <button id="reset-filter" class="btn btn-secondary btn-sm btn-modal-secondary" style="display:none">Reset</button>
           <div id="datatable-wrapper"></div>
         </div>
       `;
@@ -710,6 +719,45 @@ function renderDataTable(wrapper, projectData) {
     `;
     document.head.appendChild(tooltipStyle);
 
+    const timeSpanFilter = document.createElement("style");
+    timeSpanFilter.innerHTML = `
+    /* Styling the dropdown */
+    .custom-dropdown-timespan {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background: #f5f5f5;
+      border: none;
+      padding: 5px 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      width: 180px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* Dropdown container */
+    .dropdown-container {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* Custom dropdown arrow */
+    .dropdown-container::after {
+      content: '▾'; /* Down arrow */
+      font-size: 14px;
+      color: #666;
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+  `;
+  document.head.appendChild(timeSpanFilter);
+
     // Add the info icon with hover functionality
     const infoIcon = document.createElement("span");
     infoIcon.id = "info-icon";
@@ -722,18 +770,27 @@ function renderDataTable(wrapper, projectData) {
     header.appendChild(infoIcon);
 
     // Get references to the tabs
+    const recent_projectsTab = document.getElementById("DAP-recent-project-tab");
     const your_projectsTab = document.getElementById("DAP-your-project-tab");
     const all_projectsTab = document.getElementById("DAP-all-project-tab");
 
     // Event listener for the Your Projects tab
     your_projectsTab.addEventListener("click", () => {
+      //hide time-span-filter
+      document.querySelector(".dropdown-container").style.display = "none";
+
+      //hide reset-filter button
+      document.querySelector("#reset-filter").style.display = "none";
+
       // Remove 'active' class from All Projects tab and set to Your Projects
+      recent_projectsTab.classList.remove("active");
       all_projectsTab.classList.remove("active");
       your_projectsTab.classList.add("active");
 
       // Set visual feedback for selection
       your_projectsTab.setAttribute("aria-selected", "true");
       all_projectsTab.setAttribute("aria-selected", "false");
+      recent_projectsTab.setAttribute("aria-selected", "false");
 
     // Show content for the Your Projects tab
       show_tab("Your Projects", projectData);
@@ -741,21 +798,168 @@ function renderDataTable(wrapper, projectData) {
 
     // Event listener for the All Projects tab
     all_projectsTab.addEventListener("click", () => {
+        //hide time-span filter
+        document.querySelector(".dropdown-container").style.display = "none";
+  
+        //hide reset-filter button
+        document.querySelector("#reset-filter").style.display = "none";
+
         // Remove 'active' class from Your Projects tab and set to All Projects
+        recent_projectsTab.classList.remove("active");
         your_projectsTab.classList.remove("active");
         all_projectsTab.classList.add("active");
-
+        
         // Set visual feedback for selection
         all_projectsTab.setAttribute("aria-selected", "true");
         your_projectsTab.setAttribute("aria-selected", "false");
+        recent_projectsTab.setAttribute("aria-selected", "false");
 
         // Show content for the All Projects tab
       show_tab("All Projects", projectData);
     });
 
+    recent_projectsTab.addEventListener("click", (e) => {
+      // Remove 'active' class from Your Projects tab and set to All Projects
+      recent_projectsTab.classList.add("active");
+      all_projectsTab.classList.remove("active");
+      your_projectsTab.classList.remove("active");
+
+      // Set visual feedback for selection
+      recent_projectsTab.setAttribute("aria-selected", "true");
+      your_projectsTab.setAttribute("aria-selected", "false");
+      all_projectsTab.setAttribute("aria-selected", "false");
+
+      // Show the time-span filter when clicking "Recent Projects"
+      const dropdownContainer = document.querySelector(".dropdown-container");
+      dropdownContainer.style.display = "inline-block";
+
+      //show reset button
+      document.querySelector("#reset-filter").style.display = "inline-block";
+
+      // Get the dropdown select element
+      const selectElement = document.getElementById("time-span-select");
+
+      // Clear existing options to prevent duplicates
+      selectElement.innerHTML = "";
+
+      // Time-span filter options with mapped values
+      const timeSpanOptions = [
+          { label: "Last 7 Days", value: { type: "days", amount: -7 } },
+          { label: "Last 14 Days", value: { type: "days", amount: -14 } },
+          { label: "Last 30 Days", value: { type: "days", amount: -30 } },
+          { label: "Last Week", value: { type: "week", amount: -1 } },
+          { label: "Last Month", value: { type: "month", amount: -1 } },
+          { label: "Last Quarter", value: { type: "quarter", amount: -1 } },
+          { label: "Last 6 Months", value: { type: "months", amount: -6 } },
+          { label: "Last Year", value: { type: "year", amount: -1 } },
+          { label: "Yesterday", value: { type: "days", amount: -1 } },
+          { label: "Today", value: { type: "days", amount: 0 } },
+          { label: "This Week", value: { type: "week", amount: 0 } },
+          { label: "This Month", value: { type: "month", amount: 0 } },
+          { label: "This Quarter", value: { type: "quarter", amount: 0 } },
+          { label: "This Year", value: { type: "year", amount: 0 } },
+      ];
+
+      // Populate the dropdown after DOM is ready
+      setTimeout(() => {
+        const selectElement = document.getElementById("time-span-select");
+
+        if (selectElement) {
+          // Populate dropdown options
+          timeSpanOptions.forEach(({ label }, index) => {
+            const opt = document.createElement("option");
+            opt.value = index; // Store index to map later
+            opt.textContent = label; // Display text
+            selectElement.appendChild(opt);
+          });
+
+          // Add change event listener
+          $(selectElement).off("change").on("change",  function () {
+            const selectedIndex = parseInt(this.value);
+            const selectedOption = timeSpanOptions[selectedIndex];
+
+              if (selectedOption) {
+                const { from_date, to_date } = getDateRange(selectedOption.value);
+                let filterProjectData = filterProjectDataByDateRange(projectData, from_date, to_date);
+                show_tab("Recent Projects", filterProjectData);
+              }
+          });
+
+          // Reset filter to default timespan
+          $("#reset-filter").off('click').on('click', function () {
+            defaultFilter();
+          });
+          defaultFilter()
+        }
+      }, 0); // Runs after the DOM update
+    });
+
   // Initial tab content setup: Show content for 'Your Projects' by default
   show_tab("Your Projects", projectData); // Set 'Your Projects' as default
 }
+
+function defaultFilter(){
+  const selectElement = document.getElementById("time-span-select");
+  selectElement.selectedIndex = 0; // Set to the default option
+  // Manually trigger change event to reapply filtering
+  $(selectElement).trigger("change");
+}
+
+//Function to filter projectData based on from_date and to_date
+function filterProjectDataByDateRange(projectData, fromDate, toDate) {
+  // Convert fromDate and toDate to Date objects
+  const fromDateObj = new Date(fromDate);
+  const toDateObj = new Date(toDate);
+
+  const filteredData = projectData.filter(project => {
+      const todoCreationDate = new Date(project.todo_creation_date); // Convert todo_creation_date to Date object
+
+      // Validate if the todo_creation_date is a valid date
+      if (isNaN(todoCreationDate)) {
+        return false; // Skip invalid dates
+      }
+
+      // Check if the todo_creation_date is within the from_date and to_date range
+      return todoCreationDate >= fromDateObj && todoCreationDate <= toDateObj;
+  });
+  return filteredData;
+}
+    
+//function to return from date and to date
+function getDateRange(option) {
+  let today = frappe.datetime.get_today(); // Get today's date
+  let from_date, to_date;
+
+  if (option.type === "days") {
+    from_date = frappe.datetime.add_days(today, option.amount);
+    to_date = today;
+  } else if (option.type === "week") {
+      from_date = frappe.datetime.add_days(today, option.amount * 7);
+      to_date = frappe.datetime.add_days(from_date, 6); // End of week
+    } else if (option.type === "month") {
+      from_date = frappe.datetime.month_start();
+      to_date = frappe.datetime.month_end();
+      if (option.amount !== 0) {
+        from_date = frappe.datetime.add_months(from_date, option.amount);
+        to_date = frappe.datetime.add_months(to_date, option.amount);
+      }
+    } else if (option.type === "quarter") {
+      from_date = frappe.datetime.quarter_start();
+      to_date = frappe.datetime.quarter_end();
+      if (option.amount !== 0) {
+        from_date = frappe.datetime.add_months(from_date, option.amount * 3);
+        to_date = frappe.datetime.add_months(to_date, option.amount * 3);
+      }
+    } else if (option.type === "year") {
+      from_date = frappe.datetime.year_start();
+      to_date = frappe.datetime.year_end();
+      if (option.amount !== 0) {
+        from_date = frappe.datetime.add_months(from_date, option.amount * 12);
+        to_date = frappe.datetime.add_months(to_date, option.amount * 12);
+      }
+    }
+    return { from_date, to_date };
+  }
 
 // Show tab content based on the selected tab
 function show_tab(tab, projectData) {
@@ -765,7 +969,7 @@ function show_tab(tab, projectData) {
     cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
     datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
-    if (tab === "Your Projects") {
+    if (tab === "Your Projects" || tab === "Recent Projects") {
     // Logic to hide the specific column when "Your Projects" tab is active
   
       let style = document.createElement("style");
@@ -916,7 +1120,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   
   
   function linkFormatter1(value, row) {
-    return `<a href="#" onclick="handleProjectClick('${row[3].content}');">${row[2].content}</a>`;
+    return `<a href="#" onclick="handleProjectClick('${row[10].content}');">${row[2].content}</a>`;
   }
   function linkFormatter(value, row) {
     return `<a href="#" onclick="handleCustomerClick('${row[5].content}');">${row[5].content}</a>`;
